@@ -1,105 +1,180 @@
 /**
- * Gesture Control Module
+ * Gesture Control Module (MediaPipe Hands)
  * 
- * Detects swipe gestures on the reading area using touch/mouse events.
- * Supports: swipe-left (next), swipe-right (previous), swipe-up (scroll up), swipe-down.
+ * Uses the webcam to detect hand movements:
+ * - Swipe Left (Index finger moves left across screen)
+ * - Swipe Right (Index finger moves right across screen)
+ * - Pinch (Index and Thumb tips meet)
  */
 
-const SWIPE_THRESHOLD = 80;  // minimum px for a swipe
-const SWIPE_TIMEOUT = 300;   // max ms for a swipe gesture
+const MEDIAPIPE_HANDS = 'https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js';
+const MEDIAPIPE_CAMERA = 'https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js';
 
 export function createGestureControl() {
   let isActive = false;
   let gestureCallback = null;
-  let startX = 0;
-  let startY = 0;
-  let startTime = 0;
-  let touchMoveHandler = null;
-  let touchStartHandler = null;
-  let touchEndHandler = null;
-  let mouseMoveHandler = null;
-  let mouseDownHandler = null;
-  let mouseUpHandler = null;
-  let isMouseDown = false;
+  let handsModel = null;
+  let camera = null;
+  let videoElement = null;
+  let scriptLoaded = false;
+  let lastGestureTime = 0;
+  const GESTURE_COOLDOWN = 1000; // 1s cooldown between gestures
 
-  function initialize(onGesture) {
+  // Swipe tracking
+  let pointerHistory = [];
+  const HISTORY_SIZE = 10;
+  const SWIPE_VELOCITY_THRESHOLD = 0.05; // Normalized screen distance / frame
+
+  async function loadScripts() {
+    if (scriptLoaded || typeof window === 'undefined') return true;
+
+    return new Promise((resolve) => {
+      if (window.Hands && window.Camera) {
+        scriptLoaded = true;
+        return resolve(true);
+      }
+
+      const loadScript = (src) => new Promise((res, rej) => {
+        const s = document.createElement('script');
+        s.src = src;
+        s.crossOrigin = 'anonymous';
+        s.onload = res;
+        s.onerror = rej;
+        document.head.appendChild(s);
+      });
+
+      Promise.all([loadScript(MEDIAPIPE_CAMERA), loadScript(MEDIAPIPE_HANDS)])
+        .then(() => {
+          scriptLoaded = true;
+          resolve(true);
+        })
+        .catch(() => resolve(false));
+    });
+  }
+
+  async function initialize(onGesture) {
     gestureCallback = onGesture;
-    return { supported: true };
+    const loaded = await loadScripts();
+    if (!loaded) return { success: false, error: 'Failed to load MediaPipe' };
+    return { success: true };
   }
 
-  function start(element) {
-    if (!element || isActive) return;
-    isActive = true;
+  async function start() {
+    if (isActive || !window.Hands || !window.Camera) return;
 
-    // --- Touch events ---
-    touchStartHandler = (e) => {
-      const touch = e.touches[0];
-      startX = touch.clientX;
-      startY = touch.clientY;
-      startTime = Date.now();
-    };
+    try {
+      videoElement = document.createElement('video');
+      videoElement.style.display = 'none';
+      document.body.appendChild(videoElement);
 
-    touchEndHandler = (e) => {
-      if (!startTime) return;
-      const touch = e.changedTouches[0];
-      detectSwipe(touch.clientX, touch.clientY);
-    };
+      handsModel = new window.Hands({locateFile: (file) => {
+        return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+      }});
 
-    // --- Mouse events (trackpad swipe simulation) ---
-    mouseDownHandler = (e) => {
-      isMouseDown = true;
-      startX = e.clientX;
-      startY = e.clientY;
-      startTime = Date.now();
-    };
+      handsModel.setOptions({
+        maxNumHands: 1,
+        modelComplexity: 0,
+        minDetectionConfidence: 0.7,
+        minTrackingConfidence: 0.5
+      });
 
-    mouseUpHandler = (e) => {
-      if (!isMouseDown) return;
-      isMouseDown = false;
-      detectSwipe(e.clientX, e.clientY);
-    };
+      handsModel.onResults(onResults);
 
-    element.addEventListener('touchstart', touchStartHandler, { passive: true });
-    element.addEventListener('touchend', touchEndHandler, { passive: true });
-    element.addEventListener('mousedown', mouseDownHandler);
-    element.addEventListener('mouseup', mouseUpHandler);
+      camera = new window.Camera(videoElement, {
+        onFrame: async () => {
+          if (isActive && handsModel) {
+            await handsModel.send({image: videoElement});
+          }
+        },
+        width: 640,
+        height: 480
+      });
 
-    return () => stop(element);
-  }
-
-  function detectSwipe(endX, endY) {
-    const elapsed = Date.now() - startTime;
-    if (elapsed > SWIPE_TIMEOUT) return;
-
-    const deltaX = endX - startX;
-    const deltaY = endY - startY;
-    const absX = Math.abs(deltaX);
-    const absY = Math.abs(deltaY);
-
-    // Determine primary direction
-    if (absX > absY && absX > SWIPE_THRESHOLD) {
-      const gesture = deltaX > 0 ? 'swipe_right' : 'swipe_left';
-      if (gestureCallback) gestureCallback(gesture);
-    } else if (absY > absX && absY > SWIPE_THRESHOLD) {
-      const gesture = deltaY > 0 ? 'swipe_down' : 'swipe_up';
-      if (gestureCallback) gestureCallback(gesture);
+      isActive = true;
+      camera.start();
+    } catch (err) {
+      console.error('Gesture Camera Error:', err);
     }
 
-    startTime = 0;
+    return stop;
   }
 
-  function stop(element) {
+  function onResults(results) {
+    if (!isActive || !results.multiHandLandmarks || results.multiHandLandmarks.length === 0) {
+      pointerHistory = [];
+      return;
+    }
+
+    const landmarks = results.multiHandLandmarks[0];
+    const indexTip = landmarks[8];
+    const thumbTip = landmarks[4];
+    const now = Date.now();
+
+    // 1. Detect Pinch (Toggle Focus Mode)
+    const pinchDist = Math.hypot(indexTip.x - thumbTip.x, indexTip.y - thumbTip.y);
+    if (pinchDist < 0.05 && (now - lastGestureTime) > GESTURE_COOLDOWN) {
+      lastGestureTime = now;
+      if (gestureCallback) gestureCallback('pinch');
+      pointerHistory = [];
+      return;
+    }
+
+    // 2. Track Index Tip for swipes
+    pointerHistory.push(indexTip);
+    if (pointerHistory.length > HISTORY_SIZE) {
+      pointerHistory.shift();
+    }
+
+    if (pointerHistory.length === HISTORY_SIZE && (now - lastGestureTime) > GESTURE_COOLDOWN) {
+      const first = pointerHistory[0];
+      const last = pointerHistory[HISTORY_SIZE - 1];
+
+      const dx = last.x - first.x;
+      const dy = last.y - first.y;
+
+      if (Math.abs(dx) > Math.abs(dy)) {
+        // Horizontal swipe
+        // Note: Camera feed is usually mirrored. x increases to the right of the image, 
+        // which means the user moving their hand to their right.
+        if (dx < -SWIPE_VELOCITY_THRESHOLD) {
+          lastGestureTime = now;
+          if (gestureCallback) gestureCallback('swipe_left');
+        } else if (dx > SWIPE_VELOCITY_THRESHOLD) {
+          lastGestureTime = now;
+          if (gestureCallback) gestureCallback('swipe_right');
+        }
+      } else {
+        // Vertical Swipe (Scrolling)
+        if (dy < -SWIPE_VELOCITY_THRESHOLD) {
+          lastGestureTime = now;
+          if (gestureCallback) gestureCallback('swipe_up');
+        } else if (dy > SWIPE_VELOCITY_THRESHOLD) {
+          lastGestureTime = now;
+          if (gestureCallback) gestureCallback('swipe_down');
+        }
+      }
+    }
+  }
+
+  function stop() {
     isActive = false;
-    if (element) {
-      if (touchStartHandler) element.removeEventListener('touchstart', touchStartHandler);
-      if (touchEndHandler) element.removeEventListener('touchend', touchEndHandler);
-      if (mouseDownHandler) element.removeEventListener('mousedown', mouseDownHandler);
-      if (mouseUpHandler) element.removeEventListener('mouseup', mouseUpHandler);
+    if (camera) {
+      camera.stop();
+      camera = null;
     }
+    if (handsModel) {
+      handsModel.close();
+      handsModel = null;
+    }
+    if (videoElement) {
+      videoElement.remove();
+      videoElement = null;
+    }
+    pointerHistory = [];
   }
 
   function destroy() {
-    isActive = false;
+    stop();
     gestureCallback = null;
   }
 

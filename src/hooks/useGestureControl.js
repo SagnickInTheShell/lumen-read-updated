@@ -11,35 +11,33 @@ import { useReading } from '@/context/ReadingContext';
  * Triggers context actions on swipe.
  */
 export function useGestureControl() {
-  const { state, setParagraphIndex } = useReading();
+  const { state, setParagraphIndex, toggleMode } = useReading();
   const controlsRef = useRef(null);
 
   useEffect(() => {
     controlsRef.current = createGestureControl();
 
     controlsRef.current.initialize((gesture) => {
-      // Only process navigate gestures if focus mode is active, 
-      // otherwise fallback to normal scroll or logic
-      if (state.gestureControl) {
-        if (gesture === 'swipe_left') {
-          // Next
-          if (state.focusMode) {
-             setParagraphIndex(Math.min(state.currentParagraphIndex + 1, state.totalParagraphs - 1));
-          } else {
-             window.scrollBy({ top: window.innerHeight * 0.8, behavior: 'smooth' });
-          }
-        } else if (gesture === 'swipe_right') {
-          // Previous
-          if (state.focusMode) {
-             setParagraphIndex(Math.max(state.currentParagraphIndex - 1, 0));
-          } else {
-             window.scrollBy({ top: -window.innerHeight * 0.8, behavior: 'smooth' });
-          }
-        } else if (gesture === 'swipe_up') {
-          window.scrollBy({ top: window.innerHeight * 0.8, behavior: 'smooth' });
-        } else if (gesture === 'swipe_down') {
-          window.scrollBy({ top: -window.innerHeight * 0.8, behavior: 'smooth' });
+      if (!state.gestureControl) return;
+
+      if (gesture === 'pinch') {
+        toggleMode('focusMode');
+      } else if (gesture === 'swipe_left') {
+        if (state.focusMode) {
+           setParagraphIndex(Math.min(state.currentParagraphIndex + 1, state.totalParagraphs - 1));
+        } else {
+           window.scrollBy({ top: window.innerHeight * 0.8, behavior: 'smooth' });
         }
+      } else if (gesture === 'swipe_right') {
+        if (state.focusMode) {
+           setParagraphIndex(Math.max(state.currentParagraphIndex - 1, 0));
+        } else {
+           window.scrollBy({ top: -window.innerHeight * 0.8, behavior: 'smooth' });
+        }
+      } else if (gesture === 'swipe_up') {
+        window.scrollBy({ top: window.innerHeight * 0.8, behavior: 'smooth' });
+      } else if (gesture === 'swipe_down') {
+        window.scrollBy({ top: -window.innerHeight * 0.8, behavior: 'smooth' });
       }
     });
 
@@ -48,16 +46,21 @@ export function useGestureControl() {
         controlsRef.current.destroy();
       }
     };
-  }, [state.gestureControl, state.focusMode, state.currentParagraphIndex, state.totalParagraphs, setParagraphIndex]);
+  }, [state.gestureControl, state.focusMode, state.currentParagraphIndex, state.totalParagraphs, setParagraphIndex, toggleMode]);
 
-  // We want to attach to document or main element
+  // Handle start/stop and camera lifecycle
   useEffect(() => {
+    let stopFn = null;
     if (state.gestureControl && controlsRef.current) {
-      const stop = controlsRef.current.start(document.documentElement);
-      return () => {
-        if (stop) stop();
-      };
+      controlsRef.current.start().then((stopCallback) => {
+        stopFn = stopCallback;
+      });
     }
+
+    return () => {
+      if (stopFn) stopFn();
+      else if (controlsRef.current) controlsRef.current.stop();
+    };
   }, [state.gestureControl]);
 
   return null;
