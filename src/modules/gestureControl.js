@@ -167,17 +167,22 @@ export function createGestureControl() {
         { tip: 16, joint: 14 }, // Ring
         { tip: 20, joint: 18 }  // Pinky
       ];
-      // true if all tips are higher (y is smaller) than their middle joints
       return fingers.every(f => lm[f.tip].y < lm[f.joint].y);
     };
 
+    // Calculate pinch between thumb and index
+    const pinchDist = Math.hypot(indexTip.x - thumbTip.x, indexTip.y - thumbTip.y);
+    const isPinched = pinchDist < 0.06; // slightly forgiving pinch threshold
+
     // Continuous Joystick Scrolling for Y axis
-    // Top 30% = scroll up, Bottom 30% = scroll down
-    // We only trigger scrolling if there hasn't been a recent discrete horizontal swipe
-    if ((now - lastGestureTime) > 300) {
-      if (indexTip.y < 0.3) {
+    // ONLY when thumb and index are pinched together!
+    // Top 40% = scroll up, Bottom 40% = scroll down (expanded grab zones)
+    if (isPinched && (now - lastGestureTime) > 300) {
+      // Map based on the center of the pinch
+      const pinchY = (indexTip.y + thumbTip.y) / 2;
+      if (pinchY < 0.4) {
         if (gestureCallback) gestureCallback('scroll_up');
-      } else if (indexTip.y > 0.7) {
+      } else if (pinchY > 0.6) {
         if (gestureCallback) gestureCallback('scroll_down');
       }
     }
