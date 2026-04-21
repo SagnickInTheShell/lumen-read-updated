@@ -4,7 +4,13 @@ import { createContext, useContext, useReducer, useCallback } from 'react';
 
 const ReadingContext = createContext(null);
 
+import sampleContent from '@/data/sampleContent';
+import { storage } from '@/lib/storage';
+
 const initialState = {
+  // Reading tracking
+  content: sampleContent.paragraphs,
+  bookId: 'sample',
   // Modes
   dyslexiaMode: false,
   focusMode: false,
@@ -49,6 +55,14 @@ const initialState = {
 
 function readingReducer(state, action) {
   switch (action.type) {
+    case 'SET_BOOK':
+      return {
+        ...state,
+        bookId: action.payload.bookId,
+        content: action.payload.content,
+        totalParagraphs: action.payload.content.length,
+        currentParagraphIndex: 0
+      };
     case 'TOGGLE_MODE': {
       const mode = action.payload;
       const newValue = !state[mode];
@@ -150,8 +164,30 @@ function readingReducer(state, action) {
   }
 }
 
-export function ReadingProvider({ children }) {
+export function ReadingProvider({ children, bookId = 'sample' }) {
   const [state, dispatch] = useReducer(readingReducer, initialState);
+  const [isReady, setIsReady] = React.useState(false);
+
+  React.useEffect(() => {
+    async function loadBook() {
+      if (bookId === 'sample') {
+         dispatch({ type: 'SET_BOOK', payload: { bookId: 'sample', content: sampleContent.paragraphs } });
+      } else {
+         try {
+           const paragraphs = await storage.getBookContent(bookId);
+           if (paragraphs && paragraphs.length > 0) {
+              dispatch({ type: 'SET_BOOK', payload: { bookId, content: paragraphs } });
+           } else {
+              alert('Book content not found.');
+           }
+         } catch(e) {
+           console.error(e);
+         }
+      }
+      setIsReady(true);
+    }
+    loadBook();
+  }, [bookId]);
 
   const toggleMode = useCallback((mode) => {
     dispatch({ type: 'TOGGLE_MODE', payload: mode });
@@ -205,7 +241,7 @@ export function ReadingProvider({ children }) {
 
   return (
     <ReadingContext.Provider value={value}>
-      {children}
+      {isReady ? children : <div className="h-screen w-full flex items-center justify-center">Loading Data...</div>}
     </ReadingContext.Provider>
   );
 }
