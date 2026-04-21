@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useReducer, useCallback } from 'react';
+import { createContext, useContext, useReducer, useCallback, useState, useEffect } from 'react';
 
 const ReadingContext = createContext(null);
 
@@ -166,9 +166,9 @@ function readingReducer(state, action) {
 
 export function ReadingProvider({ children, bookId = 'sample' }) {
   const [state, dispatch] = useReducer(readingReducer, initialState);
-  const [isReady, setIsReady] = React.useState(false);
+  const [isReady, setIsReady] = useState(false);
 
-  React.useEffect(() => {
+  useEffect(() => {
     async function loadBook() {
       if (bookId === 'sample') {
          dispatch({ type: 'SET_BOOK', payload: { bookId: 'sample', content: sampleContent.paragraphs } });
