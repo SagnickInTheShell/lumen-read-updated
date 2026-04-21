@@ -13,24 +13,33 @@ import { useReading } from '@/context/ReadingContext';
 export function useGestureControl() {
   const { state, setParagraphIndex, toggleMode } = useReading();
   const controlsRef = useRef(null);
+  
+  // Use a mutable ref.current to store fresh state values
+  // so we don't have to recreate the MediaPipe instance when state changes
+  const stateRef = useRef({ state, setParagraphIndex, toggleMode });
+  useEffect(() => {
+    stateRef.current = { state, setParagraphIndex, toggleMode };
+  }, [state, setParagraphIndex, toggleMode]);
 
+  // Init gesture control ONLY ONCE
   useEffect(() => {
     controlsRef.current = createGestureControl();
 
     controlsRef.current.initialize((gesture) => {
-      if (!state.gestureControl) return;
+      const current = stateRef.current;
+      if (!current.state.gestureControl) return;
 
       if (gesture === 'pinch') {
-        toggleMode('focusMode');
+        current.toggleMode('focusMode');
       } else if (gesture === 'swipe_left') {
-        if (state.focusMode) {
-           setParagraphIndex(Math.min(state.currentParagraphIndex + 1, state.totalParagraphs - 1));
+        if (current.state.focusMode) {
+           current.setParagraphIndex(Math.min(current.state.currentParagraphIndex + 1, current.state.totalParagraphs - 1));
         } else {
            window.scrollBy({ top: window.innerHeight * 0.8, behavior: 'smooth' });
         }
       } else if (gesture === 'swipe_right') {
-        if (state.focusMode) {
-           setParagraphIndex(Math.max(state.currentParagraphIndex - 1, 0));
+        if (current.state.focusMode) {
+           current.setParagraphIndex(Math.max(current.state.currentParagraphIndex - 1, 0));
         } else {
            window.scrollBy({ top: -window.innerHeight * 0.8, behavior: 'smooth' });
         }
@@ -46,9 +55,9 @@ export function useGestureControl() {
         controlsRef.current.destroy();
       }
     };
-  }, [state.gestureControl, state.focusMode, state.currentParagraphIndex, state.totalParagraphs, setParagraphIndex, toggleMode]);
+  }, []); // Empty dependency array ensures we only initialize ONCE
 
-  // Handle start/stop and camera lifecycle
+  // Handle start/stop when toggle mode changes
   useEffect(() => {
     let stopFn = null;
     if (state.gestureControl && controlsRef.current) {
@@ -58,8 +67,11 @@ export function useGestureControl() {
     }
 
     return () => {
-      if (stopFn) stopFn();
-      else if (controlsRef.current) controlsRef.current.stop();
+      if (stopFn) {
+        stopFn();
+      } else if (controlsRef.current) {
+        controlsRef.current.stop();
+      }
     };
   }, [state.gestureControl]);
 

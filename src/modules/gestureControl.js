@@ -59,13 +59,35 @@ export function createGestureControl() {
     return { success: true };
   }
 
+  let canvasElement = null;
+  let canvasCtx = null;
+
   async function start() {
     if (isActive || !window.Hands || !window.Camera) return;
 
     try {
       videoElement = document.createElement('video');
-      videoElement.style.display = 'none';
+      videoElement.style.position = 'absolute';
+      videoElement.style.opacity = '0'; // keep it playing but hidden
+      videoElement.style.width = '320px';
+      videoElement.style.height = '240px';
+      videoElement.playsInline = true;
       document.body.appendChild(videoElement);
+
+      // Create a small feedback canvas in the corner
+      canvasElement = document.createElement('canvas');
+      canvasElement.width = 320;
+      canvasElement.height = 240;
+      canvasElement.style.position = 'fixed';
+      canvasElement.style.bottom = '20px';
+      canvasElement.style.right = '20px';
+      canvasElement.style.zIndex = '9999';
+      canvasElement.style.borderRadius = '12px';
+      canvasElement.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
+      canvasElement.style.backgroundColor = '#000';
+      canvasElement.style.transform = 'scaleX(-1)'; // mirror user
+      document.body.appendChild(canvasElement);
+      canvasCtx = canvasElement.getContext('2d');
 
       handsModel = new window.Hands({locateFile: (file) => {
         return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
@@ -86,8 +108,8 @@ export function createGestureControl() {
             await handsModel.send({image: videoElement});
           }
         },
-        width: 640,
-        height: 480
+        width: 320,
+        height: 240
       });
 
       isActive = true;
@@ -100,7 +122,32 @@ export function createGestureControl() {
   }
 
   function onResults(results) {
-    if (!isActive || !results.multiHandLandmarks || results.multiHandLandmarks.length === 0) {
+    if (!isActive) return;
+
+    // Draw visual feedback
+    if (canvasCtx && canvasElement) {
+      canvasCtx.save();
+      canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+      if (results.image) {
+        canvasCtx.drawImage(results.image, 0, 0, canvasElement.width, canvasElement.height);
+      }
+      
+      if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+        for (const landmarks of results.multiHandLandmarks) {
+          // Draw points with small colored circles
+          for (const point of landmarks) {
+            canvasCtx.beginPath();
+            canvasCtx.arc(point.x * canvasElement.width, point.y * canvasElement.height, 4, 0, 2 * Math.PI);
+            canvasCtx.fillStyle = '#ffc107'; // lumen accent
+            canvasCtx.fill();
+            canvasCtx.closePath();
+          }
+        }
+      }
+      canvasCtx.restore();
+    }
+
+    if (!results.multiHandLandmarks || results.multiHandLandmarks.length === 0) {
       pointerHistory = [];
       return;
     }
@@ -134,8 +181,6 @@ export function createGestureControl() {
 
       if (Math.abs(dx) > Math.abs(dy)) {
         // Horizontal swipe
-        // Note: Camera feed is usually mirrored. x increases to the right of the image, 
-        // which means the user moving their hand to their right.
         if (dx < -SWIPE_VELOCITY_THRESHOLD) {
           lastGestureTime = now;
           if (gestureCallback) gestureCallback('swipe_left');
@@ -169,6 +214,11 @@ export function createGestureControl() {
     if (videoElement) {
       videoElement.remove();
       videoElement = null;
+    }
+    if (canvasElement) {
+      canvasElement.remove();
+      canvasElement = null;
+      canvasCtx = null;
     }
     pointerHistory = [];
   }
