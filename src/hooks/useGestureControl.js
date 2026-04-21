@@ -29,9 +29,7 @@ export function useGestureControl() {
       const current = stateRef.current;
       if (!current.state.gestureControl) return;
 
-      if (gesture === 'pinch') {
-        current.toggleMode('focusMode');
-      } else if (gesture === 'swipe_left') {
+      if (gesture === 'swipe_left') {
         if (current.state.focusMode) {
            current.setParagraphIndex(Math.min(current.state.currentParagraphIndex + 1, current.state.totalParagraphs - 1));
         } else {
@@ -43,10 +41,12 @@ export function useGestureControl() {
         } else {
            window.scrollBy({ top: -window.innerHeight * 0.8, behavior: 'smooth' });
         }
-      } else if (gesture === 'swipe_up') {
-        window.scrollBy({ top: window.innerHeight * 0.8, behavior: 'smooth' });
-      } else if (gesture === 'swipe_down') {
-        window.scrollBy({ top: -window.innerHeight * 0.8, behavior: 'smooth' });
+      } else if (gesture === 'scroll_up') {
+        // Continuous, smooth scroll up
+        window.scrollBy({ top: -15 });
+      } else if (gesture === 'scroll_down') {
+        // Continuous, smooth scroll down
+        window.scrollBy({ top: 15 });
       }
     });
 

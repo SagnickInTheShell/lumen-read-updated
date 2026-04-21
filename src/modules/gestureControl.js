@@ -157,14 +157,7 @@ export function createGestureControl() {
     const thumbTip = landmarks[4];
     const now = Date.now();
 
-    // 1. Detect Pinch (Toggle Focus Mode)
-    const pinchDist = Math.hypot(indexTip.x - thumbTip.x, indexTip.y - thumbTip.y);
-    if (pinchDist < 0.05 && (now - lastGestureTime) > GESTURE_COOLDOWN) {
-      lastGestureTime = now;
-      if (gestureCallback) gestureCallback('pinch');
-      pointerHistory = [];
-      return;
-    }
+    // Remove pinch tracking
 
     // Helper to detect if hand is open (all fingers extended upwards)
     const isOpenPalm = (lm) => {
@@ -178,7 +171,18 @@ export function createGestureControl() {
       return fingers.every(f => lm[f.tip].y < lm[f.joint].y);
     };
 
-    // 2. Track Index Tip for swipes ONLY if palm is open
+    // Continuous Joystick Scrolling for Y axis
+    // Top 30% = scroll up, Bottom 30% = scroll down
+    // We only trigger scrolling if there hasn't been a recent discrete horizontal swipe
+    if ((now - lastGestureTime) > 300) {
+      if (indexTip.y < 0.3) {
+        if (gestureCallback) gestureCallback('scroll_up');
+      } else if (indexTip.y > 0.7) {
+        if (gestureCallback) gestureCallback('scroll_down');
+      }
+    }
+
+    // 2. Track Index Tip for horizontal swipes ONLY if palm is open
     if (isOpenPalm(landmarks)) {
       pointerHistory.push(indexTip);
       if (pointerHistory.length > HISTORY_SIZE) {
@@ -192,23 +196,16 @@ export function createGestureControl() {
         const dx = last.x - first.x;
         const dy = last.y - first.y;
 
-        if (Math.abs(dx) > Math.abs(dy)) {
-          // Horizontal swipe
+        // Ensure movement is mostly horizontal, not a messy diagonal
+        if (Math.abs(dx) > Math.abs(dy) * 1.5) {
           if (dx < -SWIPE_VELOCITY_THRESHOLD) {
             lastGestureTime = now;
             if (gestureCallback) gestureCallback('swipe_left');
+            pointerHistory = []; // Reset to prevent multiple rapid triggers
           } else if (dx > SWIPE_VELOCITY_THRESHOLD) {
             lastGestureTime = now;
             if (gestureCallback) gestureCallback('swipe_right');
-          }
-        } else {
-          // Vertical Swipe (Scrolling)
-          if (dy < -SWIPE_VELOCITY_THRESHOLD) {
-            lastGestureTime = now;
-            if (gestureCallback) gestureCallback('swipe_up');
-          } else if (dy > SWIPE_VELOCITY_THRESHOLD) {
-            lastGestureTime = now;
-            if (gestureCallback) gestureCallback('swipe_down');
+            pointerHistory = []; // Reset
           }
         }
       }
