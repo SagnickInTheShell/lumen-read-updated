@@ -1,26 +1,267 @@
 @import "tailwindcss";
 
+/* ============================================
+   LUMEN READ — Design System
+   ============================================ */
+
+/* --- Core Color Palette --- */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --lumen-bg: #faf8f5;
+  --lumen-bg-secondary: #f3f0eb;
+  --lumen-text: #2c2c2c;
+  --lumen-text-secondary: #6b6b6b;
+  --lumen-accent: #7c6aef;
+  --lumen-accent-hover: #6554d4;
+  --lumen-accent-soft: rgba(124, 106, 239, 0.1);
+  --lumen-border: #e8e4de;
+  --lumen-shadow: rgba(0, 0, 0, 0.06);
+  --lumen-success: #4caf7d;
+  --lumen-warning: #e8a838;
+
+  /* Dyslexia tint */
+  --lumen-dyslexia-bg: #fdf6e3;
+  --lumen-dyslexia-tint: rgba(253, 246, 227, 0.7);
+
+  /* High contrast */
+  --lumen-hc-bg: #1a1a2e;
+  --lumen-hc-text: #f0f0f0;
+  --lumen-hc-accent: #ffd700;
+  --lumen-hc-border: #3a3a5e;
+
+  /* Focus mode */
+  --lumen-focus-active: 1;
+  --lumen-focus-inactive: 0.15;
+
+  /* Transitions */
+  --lumen-transition-fast: 150ms ease-out;
+  --lumen-transition-normal: 250ms ease-out;
+  --lumen-transition-slow: 400ms ease-out;
+
+  /* Typography */
+  --lumen-reading-size: 1.125rem;
+  --lumen-reading-line-height: 1.85;
+  --lumen-reading-letter-spacing: 0.01em;
+  --lumen-content-width: 680px;
+
+  /* Dyslexia typography overrides */
+  --lumen-dyslexia-letter-spacing: 0.08em;
+  --lumen-dyslexia-word-spacing: 0.16em;
+  --lumen-dyslexia-line-height: 2.2;
+
+  --background: var(--lumen-bg);
+  --foreground: var(--lumen-text);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-lumen-accent: var(--lumen-accent);
+  --color-lumen-accent-hover: var(--lumen-accent-hover);
+  --color-lumen-accent-soft: var(--lumen-accent-soft);
+  --color-lumen-bg: var(--lumen-bg);
+  --color-lumen-bg-secondary: var(--lumen-bg-secondary);
+  --color-lumen-text: var(--lumen-text);
+  --color-lumen-text-secondary: var(--lumen-text-secondary);
+  --color-lumen-border: var(--lumen-border);
+  --color-lumen-success: var(--lumen-success);
+  --color-lumen-warning: var(--lumen-warning);
+  --color-lumen-hc-bg: var(--lumen-hc-bg);
+  --color-lumen-hc-text: var(--lumen-hc-text);
+  --color-lumen-hc-accent: var(--lumen-hc-accent);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* ============================================
+   OpenDyslexic Font Face
+   ============================================ */
+@font-face {
+  font-family: 'OpenDyslexic';
+  src: url('https://cdn.jsdelivr.net/npm/open-dyslexic@1.0.3/woff/OpenDyslexic-Regular.woff') format('woff');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
 }
 
+@font-face {
+  font-family: 'OpenDyslexic';
+  src: url('https://cdn.jsdelivr.net/npm/open-dyslexic@1.0.3/woff/OpenDyslexic-Bold.woff') format('woff');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ============================================
+   Base Styles
+   ============================================ */
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
+  transition: background-color var(--lumen-transition-normal),
+              color var(--lumen-transition-normal);
+}
+
+/* ============================================
+   High Contrast Mode
+   ============================================ */
+.high-contrast {
+  --background: var(--lumen-hc-bg);
+  --foreground: var(--lumen-hc-text);
+  --lumen-bg: var(--lumen-hc-bg);
+  --lumen-bg-secondary: #24244a;
+  --lumen-text: var(--lumen-hc-text);
+  --lumen-text-secondary: #c0c0c0;
+  --lumen-accent: var(--lumen-hc-accent);
+  --lumen-accent-hover: #ffc107;
+  --lumen-accent-soft: rgba(255, 215, 0, 0.15);
+  --lumen-border: var(--lumen-hc-border);
+  --lumen-shadow: rgba(0, 0, 0, 0.3);
+}
+
+/* ============================================
+   Dyslexia Mode
+   ============================================ */
+.dyslexia-mode .reading-text {
+  font-family: 'OpenDyslexic', Comic Sans MS, sans-serif !important;
+  font-size: 1.3rem;
+  letter-spacing: var(--lumen-dyslexia-letter-spacing);
+  word-spacing: var(--lumen-dyslexia-word-spacing);
+  line-height: var(--lumen-dyslexia-line-height);
+}
+
+.dyslexia-mode .reading-content {
+  background-color: var(--lumen-dyslexia-bg);
+  transition: background-color var(--lumen-transition-normal);
+}
+
+/* ============================================
+   Reading Layout
+   ============================================ */
+.reading-column {
+  max-width: var(--lumen-content-width);
+  margin: 0 auto;
+  padding: 2rem 1.5rem;
+}
+
+.reading-paragraph {
+  font-size: var(--lumen-reading-size);
+  line-height: var(--lumen-reading-line-height);
+  letter-spacing: var(--lumen-reading-letter-spacing);
+  color: var(--lumen-text);
+  margin-bottom: 1.5rem;
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  border-left: 3px solid transparent;
+  transition: all var(--lumen-transition-normal);
+}
+
+.reading-paragraph:hover {
+  background-color: var(--lumen-accent-soft);
+}
+
+.reading-paragraph.gaze-highlight {
+  background-color: var(--lumen-accent-soft);
+  border-left-color: var(--lumen-accent);
+}
+
+.reading-paragraph.audio-highlight {
+  background-color: rgba(76, 175, 125, 0.08);
+  border-left-color: var(--lumen-success);
+}
+
+/* ============================================
+   Focus Mode Styles
+   ============================================ */
+.focus-mode .reading-paragraph {
+  opacity: var(--lumen-focus-inactive);
+  filter: blur(1px);
+  transform: scale(0.98);
+  transition: all var(--lumen-transition-slow);
+}
+
+.focus-mode .reading-paragraph.focus-active {
+  opacity: var(--lumen-focus-active);
+  filter: blur(0);
+  transform: scale(1);
+  background-color: var(--lumen-accent-soft);
+  border-left-color: var(--lumen-accent);
+}
+
+/* ============================================
+   Simplified Label
+   ============================================ */
+.simplified-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--lumen-accent);
+  background: var(--lumen-accent-soft);
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  margin-bottom: 0.5rem;
+}
+
+/* ============================================
+   Scrollbar Styling
+   ============================================ */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--lumen-border);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--lumen-text-secondary);
+}
+
+/* ============================================
+   Animations
+   ============================================ */
+@keyframes pulse-mic {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(1.1); }
+}
+
+.mic-pulse {
+  animation: pulse-mic 1.5s ease-in-out infinite;
+}
+
+@keyframes gentle-glow {
+  0%, 100% { box-shadow: 0 0 0 0 var(--lumen-accent-soft); }
+  50% { box-shadow: 0 0 12px 4px var(--lumen-accent-soft); }
+}
+
+.suggestion-glow {
+  animation: gentle-glow 2s ease-in-out infinite;
+}
+
+/* ============================================
+   Mode Active Badge
+   ============================================ */
+.mode-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.65rem;
+  font-weight: 600;
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+  transition: all var(--lumen-transition-fast);
+}
+
+.mode-badge-active {
+  background: var(--lumen-accent-soft);
+  color: var(--lumen-accent);
 }

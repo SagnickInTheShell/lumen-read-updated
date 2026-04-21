@@ -1,65 +1,246 @@
-import Image from "next/image";
+'use client';
+
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { AnimatePresence } from 'framer-motion';
+import { ReadingProvider, useReading } from '@/context/ReadingContext';
+import { useReadingBehavior } from '@/hooks/useReadingBehavior';
+import { useTextToSpeech } from '@/hooks/useTextToSpeech';
+import { useVoiceControl } from '@/hooks/useVoiceControl';
+import { useEyeTracking } from '@/hooks/useEyeTracking';
+import { usePersonalization } from '@/hooks/usePersonalization';
+import { useKeyboardControls } from '@/hooks/useKeyboardControls';
+import { useGestureControl } from '@/hooks/useGestureControl';
+import Reader from '@/components/Reader';
+import Controls from '@/components/Controls';
+import AudioControls from '@/components/AudioControls';
+import FocusControls from '@/components/FocusControls';
+import SuggestionPopup from '@/components/SuggestionPopup';
+import StatusBar from '@/components/StatusBar';
+import VoiceIndicator from '@/components/VoiceIndicator';
+import CalibrationOverlay from '@/components/CalibrationOverlay';
+import sampleContent from '@/data/sampleContent';
+
+function AppContent() {
+  const { state, dispatch, toggleMode, clearSuggestion, setMode } = useReading();
+  const { acceptSuggestion, dismissSuggestion } = useReadingBehavior();
+  const { speak, pause, resume, stop, setRate } = useTextToSpeech();
+  const { initialize: initEyeTracking, setCalibrated, needsCalibration } = useEyeTracking();
+  const [showCalibration, setShowCalibration] = useState(false);
+  const suggestionTimerRef = useRef(null);
+
+  // Personalization — auto-saves/restores
+  usePersonalization();
+
+  // Get all sentences flat for TTS
+  const allSentences = sampleContent.paragraphs.flatMap(p => p.sentences);
+
+  // --- Audio handlers ---
+  const handlePlay = useCallback(() => {
+    speak(allSentences);
+  }, [speak, allSentences]);
+
+  const handlePause = useCallback(() => {
+    pause();
+  }, [pause]);
+
+  const handleResume = useCallback(() => {
+    resume();
+  }, [resume]);
+
+  const handleStop = useCallback(() => {
+    stop();
+  }, [stop]);
+
+  const handleRateChange = useCallback((rate) => {
+    setRate(rate);
+  }, [setRate]);
+
+  // --- Toggle audio mode ---
+  const handleToggleAudio = useCallback(() => {
+    if (state.audioMode) {
+      // Turning off — stop audio
+      stop();
+      toggleMode('audioMode');
+    } else {
+      toggleMode('audioMode');
+    }
+  }, [state.audioMode, stop, toggleMode]);
+
+  // --- Voice command handler ---
+  const handleVoiceCommand = useCallback((command) => {
+    switch (command) {
+      case 'next':
+        if (!state.focusMode) {
+          setMode('focusMode', true);
+        }
+        dispatch({
+          type: 'SET_PARAGRAPH_INDEX',
+          payload: Math.min(state.currentParagraphIndex + 1, state.totalParagraphs - 1),
+        });
+        break;
+      case 'previous':
+        dispatch({
+          type: 'SET_PARAGRAPH_INDEX',
+          payload: Math.max(state.currentParagraphIndex - 1, 0),
+        });
+        break;
+      case 'simplify':
+        if (!state.simplifyMode) toggleMode('simplifyMode');
+        break;
+      case 'readAloud':
+        if (!state.audioMode) {
+          toggleMode('audioMode');
+          setTimeout(() => handlePlay(), 100);
+        }
+        break;
+      case 'stop':
+        if (state.isAudioPlaying) handleStop();
+        break;
+      case 'focus':
+        toggleMode('focusMode');
+        break;
+    }
+  }, [state, toggleMode, setMode, dispatch, handlePlay, handleStop]);
+
+  // Voice control setup
+  const { supported: voiceSupported, startListening, stopListening } = useVoiceControl(handleVoiceCommand);
+
+  // Watch voice control toggle
+  useEffect(() => {
+    if (state.voiceControl && voiceSupported) {
+      startListening();
+    } else {
+      stopListening();
+    }
+  }, [state.voiceControl, voiceSupported, startListening, stopListening]);
+
+  // --- Eye tracking toggle ---
+  useEffect(() => {
+    if (state.eyeTracking) {
+      initEyeTracking().then((success) => {
+        if (success && needsCalibration) {
+          setShowCalibration(true);
+        }
+      });
+    }
+  }, [state.eyeTracking]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // --- Suggestion auto-dismiss (10 seconds) ---
+  useEffect(() => {
+    if (state.activeSuggestion) {
+      if (suggestionTimerRef.current) clearTimeout(suggestionTimerRef.current);
+      suggestionTimerRef.current = setTimeout(() => {
+        dismissSuggestion();
+        clearSuggestion();
+      }, 10000);
+    }
+    return () => {
+      if (suggestionTimerRef.current) clearTimeout(suggestionTimerRef.current);
+    };
+  }, [state.activeSuggestion, dismissSuggestion, clearSuggestion]);
+
+  // --- Suggestion handlers ---
+  const handleAcceptSuggestion = useCallback(() => {
+    const suggestion = acceptSuggestion();
+    if (suggestion && suggestion.mode) {
+      setMode(suggestion.mode, true);
+    }
+    clearSuggestion();
+  }, [acceptSuggestion, setMode, clearSuggestion]);
+
+  const handleDismissSuggestion = useCallback(() => {
+    dismissSuggestion();
+    clearSuggestion();
+  }, [dismissSuggestion, clearSuggestion]);
+
+  // Keyboard controls
+  useKeyboardControls({
+    onToggleAudio: handleToggleAudio,
+    onDismissSuggestion: handleDismissSuggestion,
+  });
+
+  // Gesture controls
+  useGestureControl();
+
+  // Apply high contrast class to html
+  useEffect(() => {
+    const html = document.documentElement;
+    if (state.highContrastMode) {
+      html.classList.add('high-contrast');
+    } else {
+      html.classList.remove('high-contrast');
+    }
+  }, [state.highContrastMode]);
+
+  // Apply dyslexia class to body
+  useEffect(() => {
+    const body = document.body;
+    if (state.dyslexiaMode) {
+      body.classList.add('dyslexia-mode');
+    } else {
+      body.classList.remove('dyslexia-mode');
+    }
+  }, [state.dyslexiaMode]);
+
+  return (
+    <div className="min-h-screen transition-colors duration-300">
+      {/* Sidebar Controls */}
+      <Controls />
+
+      {/* Main Content */}
+      <main className="ml-64 transition-[margin] duration-300 pb-10">
+        <Reader />
+      </main>
+
+      {/* Floating UI */}
+      <AnimatePresence>
+        {state.audioMode && (
+          <AudioControls
+            onPlay={handlePlay}
+            onPause={handlePause}
+            onResume={handleResume}
+            onStop={handleStop}
+            onRateChange={handleRateChange}
+          />
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        <FocusControls />
+      </AnimatePresence>
+
+      <SuggestionPopup
+        suggestion={state.activeSuggestion}
+        onAccept={handleAcceptSuggestion}
+        onDismiss={handleDismissSuggestion}
+      />
+
+      <VoiceIndicator />
+      <StatusBar />
+
+      {/* Eye Tracking Calibration */}
+      <AnimatePresence>
+        {showCalibration && (
+          <CalibrationOverlay
+            onComplete={() => {
+              setCalibrated();
+              setShowCalibration(false);
+            }}
+            onSkip={() => {
+              setCalibrated();
+              setShowCalibration(false);
+            }}
+          />
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
 
 export default function Home() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.js file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+    <ReadingProvider>
+      <AppContent />
+    </ReadingProvider>
   );
 }
