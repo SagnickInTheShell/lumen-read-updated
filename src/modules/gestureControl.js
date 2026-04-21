@@ -166,38 +166,55 @@ export function createGestureControl() {
       return;
     }
 
-    // 2. Track Index Tip for swipes
-    pointerHistory.push(indexTip);
-    if (pointerHistory.length > HISTORY_SIZE) {
-      pointerHistory.shift();
-    }
+    // Helper to detect if hand is open (all fingers extended upwards)
+    const isOpenPalm = (lm) => {
+      const fingers = [
+        { tip: 8, joint: 6 },   // Index
+        { tip: 12, joint: 10 }, // Middle
+        { tip: 16, joint: 14 }, // Ring
+        { tip: 20, joint: 18 }  // Pinky
+      ];
+      // true if all tips are higher (y is smaller) than their middle joints
+      return fingers.every(f => lm[f.tip].y < lm[f.joint].y);
+    };
 
-    if (pointerHistory.length === HISTORY_SIZE && (now - lastGestureTime) > GESTURE_COOLDOWN) {
-      const first = pointerHistory[0];
-      const last = pointerHistory[HISTORY_SIZE - 1];
+    // 2. Track Index Tip for swipes ONLY if palm is open
+    if (isOpenPalm(landmarks)) {
+      pointerHistory.push(indexTip);
+      if (pointerHistory.length > HISTORY_SIZE) {
+        pointerHistory.shift();
+      }
 
-      const dx = last.x - first.x;
-      const dy = last.y - first.y;
+      if (pointerHistory.length === HISTORY_SIZE && (now - lastGestureTime) > GESTURE_COOLDOWN) {
+        const first = pointerHistory[0];
+        const last = pointerHistory[HISTORY_SIZE - 1];
 
-      if (Math.abs(dx) > Math.abs(dy)) {
-        // Horizontal swipe
-        if (dx < -SWIPE_VELOCITY_THRESHOLD) {
-          lastGestureTime = now;
-          if (gestureCallback) gestureCallback('swipe_left');
-        } else if (dx > SWIPE_VELOCITY_THRESHOLD) {
-          lastGestureTime = now;
-          if (gestureCallback) gestureCallback('swipe_right');
-        }
-      } else {
-        // Vertical Swipe (Scrolling)
-        if (dy < -SWIPE_VELOCITY_THRESHOLD) {
-          lastGestureTime = now;
-          if (gestureCallback) gestureCallback('swipe_up');
-        } else if (dy > SWIPE_VELOCITY_THRESHOLD) {
-          lastGestureTime = now;
-          if (gestureCallback) gestureCallback('swipe_down');
+        const dx = last.x - first.x;
+        const dy = last.y - first.y;
+
+        if (Math.abs(dx) > Math.abs(dy)) {
+          // Horizontal swipe
+          if (dx < -SWIPE_VELOCITY_THRESHOLD) {
+            lastGestureTime = now;
+            if (gestureCallback) gestureCallback('swipe_left');
+          } else if (dx > SWIPE_VELOCITY_THRESHOLD) {
+            lastGestureTime = now;
+            if (gestureCallback) gestureCallback('swipe_right');
+          }
+        } else {
+          // Vertical Swipe (Scrolling)
+          if (dy < -SWIPE_VELOCITY_THRESHOLD) {
+            lastGestureTime = now;
+            if (gestureCallback) gestureCallback('swipe_up');
+          } else if (dy > SWIPE_VELOCITY_THRESHOLD) {
+            lastGestureTime = now;
+            if (gestureCallback) gestureCallback('swipe_down');
+          }
         }
       }
+    } else {
+      // If hand closes or relaxes, clear swipe history to prevent accidental triggers
+      pointerHistory = [];
     }
   }
 
