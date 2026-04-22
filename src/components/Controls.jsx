@@ -4,6 +4,9 @@ import { memo, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useReading } from '@/context/ReadingContext';
 import ModeToggle from './ModeToggle';
+import AdaptiveAutoModeToggle from './AdaptiveAutoModeToggle';
+import ConfidenceDisplay from './ConfidenceDisplay';
+import AccessibilityModes from './AccessibilityModes';
 
 /**
  * Controls — Left sidebar with mode toggles.
@@ -16,22 +19,22 @@ function Controls() {
   const [isCollapsed, setIsCollapsed] = useState(false);
 
   // Defer browser API checks to client-side only to avoid hydration mismatch
-  const [speechSupported, setSpeechSupported] = useState(true);
-  const [recognitionSupported, setRecognitionSupported] = useState(true);
-
-  useEffect(() => {
-    setSpeechSupported('speechSynthesis' in window);
-    setRecognitionSupported(!!(window.SpeechRecognition || window.webkitSpeechRecognition));
-  }, []);
+  const [speechSupported, setSpeechSupported] = useState(() => 
+    typeof window !== 'undefined' ? 'speechSynthesis' in window : true
+  );
+  const [recognitionSupported, setRecognitionSupported] = useState(() => 
+    typeof window !== 'undefined' ? !!(window.SpeechRecognition || window.webkitSpeechRecognition) : true
+  );
 
   return (
     <motion.aside
       className={`
         fixed left-0 top-0 h-full z-40
-        bg-lumen-bg/95 backdrop-blur-sm border-r border-lumen-border
+        glass backdrop-blur-xl border-r border-lumen-border/50
         flex flex-col
         transition-all duration-300
-        ${isCollapsed ? 'w-14' : 'w-64'}
+        ${isCollapsed ? 'w-16' : 'w-80'}
+        shadow-premium-xl
       `}
       initial={false}
     >
@@ -67,35 +70,60 @@ function Controls() {
             transition={{ duration: 0.15 }}
             className="flex-1 overflow-y-auto p-3 space-y-5"
           >
-            {/* Reading Modes */}
+            {/* Adaptive Auto Mode - Signature Feature */}
+            <div className="bg-gradient-to-br from-purple-50 to-blue-50 border border-purple-200 rounded-lg p-3">
+              <AdaptiveAutoModeToggle />
+            </div>
+
+            {/* Reading Confidence Display */}
+            {state.confidenceMetrics && (
+              <ConfidenceDisplay 
+                metrics={state.confidenceMetrics}
+                message={state.improvementMessage}
+              />
+            )}
+
+            {/* Premium Accessibility Modes */}
             <div>
               <h3 className="text-[0.65rem] font-semibold uppercase tracking-widest text-lumen-text-secondary mb-2 px-1">
-                Reading Modes
+                Accessibility Modes
               </h3>
               <div className="space-y-1">
-                <ModeToggle
-                  label="Focus Mode"
-                  icon="🧠"
-                  isActive={state.focusMode}
-                  onToggle={() => toggleMode('focusMode')}
-                />
                 <ModeToggle
                   label="Dyslexia Mode"
                   icon="🧬"
                   isActive={state.dyslexiaMode}
                   onToggle={() => toggleMode('dyslexiaMode')}
+                  description="OpenDyslexic font + extra spacing"
                 />
                 <ModeToggle
-                  label="Simplify Text"
-                  icon="📚"
-                  isActive={state.simplifyMode}
-                  onToggle={() => toggleMode('simplifyMode')}
+                  label="ADHD Focus Tunnel"
+                  icon="🎯"
+                  isActive={state.focusMode}
+                  onToggle={() => toggleMode('focusMode')}
+                  description="Isolate one paragraph at a time"
                 />
                 <ModeToggle
                   label="High Contrast"
                   icon="🌗"
                   isActive={state.highContrastMode}
                   onToggle={() => toggleMode('highContrastMode')}
+                  description="Max contrast for low vision"
+                />
+              </div>
+            </div>
+
+            {/* Reading Modes */}
+            <div>
+              <h3 className="text-[0.65rem] font-semibold uppercase tracking-widest text-lumen-text-secondary mb-2 px-1">
+                Reading Tools
+              </h3>
+              <div className="space-y-1">
+                <ModeToggle
+                  label="Simplify Text"
+                  icon="📚"
+                  isActive={state.simplifyMode}
+                  onToggle={() => toggleMode('simplifyMode')}
                 />
               </div>
             </div>

@@ -18,6 +18,8 @@ import SuggestionPopup from '@/components/SuggestionPopup';
 import StatusBar from '@/components/StatusBar';
 import VoiceIndicator from '@/components/VoiceIndicator';
 import CalibrationOverlay from '@/components/CalibrationOverlay';
+import Onboarding from '@/components/Onboarding';
+import SilentModeCoach from '@/components/SilentModeCoach';
 import sampleContent from '@/data/sampleContent';
 
 function AppContent() {
@@ -26,6 +28,8 @@ function AppContent() {
   const { speak, pause, resume, stop, setRate } = useTextToSpeech();
   const { initialize: initEyeTracking, setCalibrated, needsCalibration } = useEyeTracking();
   const [showCalibration, setShowCalibration] = useState(false);
+  const [onboardingComplete, setOnboardingComplete] = useState(false);
+  const [sessionMetrics, setSessionMetrics] = useState(null);
   const suggestionTimerRef = useRef(null);
 
   // Personalization — auto-saves/restores
@@ -264,6 +268,19 @@ function AppContent() {
           />
         )}
       </AnimatePresence>
+
+      {/* Onboarding - Personalization */}
+      {!onboardingComplete && (
+        <Onboarding onComplete={() => setOnboardingComplete(true)} />
+      )}
+
+      {/* Silent Mode Coach - Post-session feedback */}
+      {sessionMetrics && (
+        <SilentModeCoach 
+          metrics={sessionMetrics}
+          onDismiss={() => setSessionMetrics(null)}
+        />
+      )}
     </div>
   );
 }

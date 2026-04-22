@@ -20,6 +20,9 @@ const initialState = {
   eyeTracking: false,
   highContrastMode: false,
   handsFreeMode: false,
+  
+  // NEW: Adaptive Auto Mode
+  adaptiveAutoMode: false,
 
   // Reading state
   currentParagraphIndex: 0,
@@ -51,6 +54,19 @@ const initialState = {
 
   // Personalization
   lastReadPosition: null,
+  
+  // NEW: Personalization Profile
+  userProfile: null, // 'focus-loss' | 'blur' | 'slow-speed' | 'retention' | 'language'
+  hasCompletedOnboarding: false,
+
+  // NEW: Confidence Score
+  confidenceMetrics: null,
+  improvementMessage: null,
+  
+  // NEW: Session tracking
+  sessionStart: null,
+  activeReadingTime: 0,
+  distractionEvents: [],
 };
 
 function readingReducer(state, action) {
@@ -156,6 +172,26 @@ function readingReducer(state, action) {
     case 'SET_LAST_READ_POSITION':
       return { ...state, lastReadPosition: action.payload };
 
+    case 'SET_USER_PROFILE':
+      return { 
+        ...state, 
+        userProfile: action.payload,
+        hasCompletedOnboarding: true,
+      };
+
+    case 'UPDATE_CONFIDENCE_METRICS':
+      return { 
+        ...state, 
+        confidenceMetrics: action.payload.metrics,
+        improvementMessage: action.payload.message,
+      };
+
+    case 'RECORD_DISTRACTION_EVENT':
+      return {
+        ...state,
+        distractionEvents: [...state.distractionEvents, action.payload],
+      };
+
     case 'RESTORE_STATE':
       return { ...state, ...action.payload };
 
@@ -225,6 +261,18 @@ export function ReadingProvider({ children, bookId = 'sample' }) {
     dispatch({ type: 'SET_GAZE', payload: gazeData });
   }, []);
 
+  const setUserProfile = useCallback((profile) => {
+    dispatch({ type: 'SET_USER_PROFILE', payload: profile });
+  }, []);
+
+  const updateConfidenceMetrics = useCallback((metrics, message) => {
+    dispatch({ type: 'UPDATE_CONFIDENCE_METRICS', payload: { metrics, message } });
+  }, []);
+
+  const recordDistractionEvent = useCallback((event) => {
+    dispatch({ type: 'RECORD_DISTRACTION_EVENT', payload: event });
+  }, []);
+
   const value = {
     state,
     dispatch,
@@ -237,6 +285,9 @@ export function ReadingProvider({ children, bookId = 'sample' }) {
     setAudioState,
     setVoiceStatus,
     setGaze,
+    setUserProfile,
+    updateConfidenceMetrics,
+    recordDistractionEvent,
   };
 
   return (

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useCallback, useState } from 'react';
+import { useEffect, useRef, useCallback, useState, useMemo } from 'react';
 import { createEyeTracking } from '@/modules/eyeTracking';
 import { useReading } from '@/context/ReadingContext';
 
@@ -84,8 +84,7 @@ export function useEyeTracking() {
     }
   }, [dispatch]);
 
-  const needsCalibration = !state.eyeTrackingCalibrated && 
-    trackerRef.current && !trackerRef.current.wasCalibrated();
+  const needsCalibration = !state.eyeTrackingCalibrated;
 
   return {
     initialize,

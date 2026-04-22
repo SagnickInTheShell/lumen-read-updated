@@ -25,6 +25,8 @@ export function useTextToSpeech() {
     };
   }, []);
 
+  const speakSentenceRef = useRef(null);
+
   const speakSentence = useCallback((index) => {
     if (typeof window === 'undefined' || !window.speechSynthesis) return;
     if (index >= sentencesRef.current.length) {
@@ -47,8 +49,8 @@ export function useTextToSpeech() {
     setAudioState({ isPlaying: true, sentenceIndex: index });
 
     utterance.onend = () => {
-      if (isPlayingRef.current) {
-        speakSentence(index + 1);
+      if (isPlayingRef.current && speakSentenceRef.current) {
+        speakSentenceRef.current(index + 1);
       }
     };
 
@@ -62,6 +64,11 @@ export function useTextToSpeech() {
     utteranceRef.current = utterance;
     window.speechSynthesis.speak(utterance);
   }, [state.audioRate, setAudioState]);
+
+  // Update the ref
+  useEffect(() => {
+    speakSentenceRef.current = speakSentence;
+  }, [speakSentence]);
 
   const speak = useCallback((sentences) => {
     if (typeof window === 'undefined' || !window.speechSynthesis) return;

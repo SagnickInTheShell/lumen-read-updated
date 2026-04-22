@@ -98,9 +98,9 @@ const Paragraph = memo(function Paragraph({
  */
 function Reader() {
   const { state, dispatch, setParagraphIndex } = useReading();
+  const contentRef = useRef(null);
   const { onParagraphVisible, onParagraphHidden } = useReadingBehavior();
   const { registerParagraph } = useEyeTracking();
-  const contentRef = useRef(null);
 
   const paragraphs = sampleContent.paragraphs;
 
